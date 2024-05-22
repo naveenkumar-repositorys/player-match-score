@@ -9,12 +9,18 @@ let db = null;
 
 app.use(express.json());
 
-const listOfPlayerMatches = [];
-
 let convertDbObjectToResponseObject = (dbResponse) => {
   return {
     playerId: dbResponse.player_id,
     playerName: dbResponse.player_name,
+  };
+};
+
+let convertingDbObjToresObj = (dbResponse) => {
+  return {
+    matchId: dbResponse.match_id,
+    match: dbResponse.match,
+    year: dbResponse.year,
   };
 };
 
@@ -89,13 +95,51 @@ app.get("/matches/:matchId/", async (request, response) => {
 
 app.get("/players/:playerId/matches/", async (request, response) => {
   let { playerId } = request.params;
-  let matchesOfPlayerQuery = `SELECT match_id AS matchId,match,year
+  let matchesOfPlayerQuery = `SELECT *
   FROM 
     match_details NATURAL JOIN player_match_score
   WHERE 
     player_id = ${playerId};`;
-  let dbResponse = await db.get(matchesOfPlayerQuery);
-  listOfPlayerMatches.push(dbResponse);
-  //console.log(listOfPlayerMatches);
-  response.send(listOfPlayerMatches);
+  let dbResponse = await db.all(matchesOfPlayerQuery);
+  //console.log(dbResponse);
+  //console.log(dbResponse.map((eachItem) => convertingDbObjToresObj(eachItem)));
+  response.send(
+    dbResponse.map((eachItem) => convertingDbObjToresObj(eachItem))
+  );
 });
+
+//API-6
+
+app.get("/matches/:matchId/players/", async (request, response) => {
+  let { matchId } = request.params;
+  let allPlayersOfSpecMatchQuery = `SELECT player_id AS playerId,player_name AS playerName
+   FROM player_details NATURAL JOIN player_match_score
+   WHERE match_id = ${matchId};`;
+  let dbResponse = await db.all(allPlayersOfSpecMatchQuery);
+  //console.log(dbResponse);
+  response.send(dbResponse);
+});
+
+//API-7
+
+app.get("/players/:playerId/playerScores", async (request, response) => {
+  let { playerId } = request.params;
+  let totalDetailsOfAPlayerQuery = `SELECT 
+        player_id AS playerId,
+        player_name AS playerName,
+        SUM(score) AS totalScore,
+        SUM(fours) AS totalFours,
+        SUM(sixes) AS totalSixes
+   FROM 
+        player_match_score NATURAL JOIN player_details
+   
+   GROUP BY
+        player_id = ${playerId}
+   HAVING
+        player_id =  ${playerId};`;
+  let dbResponse = await db.get(totalDetailsOfAPlayerQuery);
+  //console.log(dbResponse);
+  response.send(dbResponse);
+});
+
+module.exports = app;
